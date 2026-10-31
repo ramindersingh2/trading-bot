@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPY Options Trading Bot — Design</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+    .container { max-width: 1300px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #22d3ee; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    h2 { font-size: 1.1rem; font-weight: 600; color: #94a3b8; margin-bottom: 1rem; margin-left: 1.75rem; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 1rem;
+      border: 1px solid #1e293b;
+      padding: 1.5rem;
+      overflow-x: auto;
+      margin-bottom: 2rem;
+    }
+    svg { display: block; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+      margin-bottom: 3rem;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 0.75rem;
+      border: 1px solid #1e293b;
+      padding: 1.25rem;
+    }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+      margin-left: 1.75rem;
+    }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+    .divider { height: 1px; background: #1e293b; margin: 2rem 0; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-row">
+      <div class="pulse-dot"></div>
+      <h1>SPY Options Trading Bot — System Design</h1>
+    </div>
+    <p class="subtitle">Prompt Structure · Data Storage · Hourly Execution Flow</p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- DIAGRAM 1: PROMPT ANATOMY                                          -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div class="section-label">Diagram 1 — What Goes Into The Prompt Every Hour</div>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1100 720" style="width:100%; min-width:900px;">
+      <defs>
+        <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+        </marker>
+        <marker id="arr-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
+        </marker>
+        <marker id="arr-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+        </marker>
+        <marker id="arr-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/>
+        </marker>
+        <marker id="arr-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/>
+        </marker>
+        <pattern id="grid1" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid1)"/>
+
+      <!-- BIG PROMPT BOX -->
+      <rect x="350" y="20" width="380" height="680" rx="12" fill="rgba(6,78,59,0.08)" stroke="#34d399" stroke-width="1.5" stroke-dasharray="6,3"/>
+      <text x="540" y="42" fill="#34d399" font-size="11" font-weight="700" text-anchor="middle">PROMPT SENT TO LLM EACH HOUR</text>
+
+      <!-- Section 1: Role -->
+      <rect x="366" y="55" width="348" height="80" rx="6" fill="#0f172a"/>
+      <rect x="366" y="55" width="348" height="80" rx="6" fill="rgba(136,19,55,0.35)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="382" y="74" fill="#fb7185" font-size="10" font-weight="700">SECTION 1 — ROLE &amp; RESPONSIBILITY</text>
+      <text x="382" y="91" fill="#cbd5e1" font-size="9">• You are a senior options trader managing a $100k portfolio</text>
+      <text x="382" y="106" fill="#cbd5e1" font-size="9">• Your ONLY goal: maximize risk-adjusted returns on SPY options</text>
+      <text x="382" y="121" fill="#cbd5e1" font-size="9">• Think step by step before every decision (CoT trigger)</text>
+
+      <!-- Section 2: Market Data -->
+      <rect x="366" y="148" width="348" height="115" rx="6" fill="#0f172a"/>
+      <rect x="366" y="148" width="348" height="115" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="382" y="167" fill="#fbbf24" font-size="10" font-weight="700">SECTION 2 — LIVE MARKET DATA (auto-fetched)</text>
+      <text x="382" y="184" fill="#cbd5e1" font-size="9">• SPY current price, open, high, low, volume</text>
+      <text x="382" y="199" fill="#cbd5e1" font-size="9">• VIX level (fear gauge) + Fear &amp; Greed Index score</text>
+      <text x="382" y="214" fill="#cbd5e1" font-size="9">• 10-year treasury yield, Fed funds rate</text>
+      <text x="382" y="229" fill="#cbd5e1" font-size="9">• SPY RSI (14), 20/50/200 day moving averages</text>
+      <text x="382" y="244" fill="#cbd5e1" font-size="9">• Support/resistance levels, % from 52-week high/low</text>
+
+      <!-- Section 3: News -->
+      <rect x="366" y="276" width="348" height="95" rx="6" fill="#0f172a"/>
+      <rect x="366" y="276" width="348" height="95" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="382" y="295" fill="#22d3ee" font-size="10" font-weight="700">SECTION 3 — TOP 5 NEWS (last 3 days)</text>
+      <text x="382" y="312" fill="#cbd5e1" font-size="9">• Fed statements / interest rate decisions</text>
+      <text x="382" y="327" fill="#cbd5e1" font-size="9">• CPI/PPI/jobs report releases</text>
+      <text x="382" y="342" fill="#cbd5e1" font-size="9">• Geopolitical events affecting markets</text>
+      <text x="382" y="357" fill="#cbd5e1" font-size="9">• S&amp;P 500 company earnings surprises</text>
+
+      <!-- Section 4: History -->
+      <rect x="366" y="384" width="348" height="130" rx="6" fill="#0f172a"/>
+      <rect x="366" y="384" width="348" height="130" rx="6" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="382" y="403" fill="#a78bfa" font-size="10" font-weight="700">SECTION 4 — YOUR HISTORY (loaded from files)</text>
+      <text x="382" y="420" fill="#fbbf24" font-size="8" font-weight="600">ALL-TIME SUMMARY:</text>
+      <text x="382" y="435" fill="#cbd5e1" font-size="9">• Total trades, win rate, total P&amp;L since day 1</text>
+      <text x="382" y="450" fill="#fbbf24" font-size="8" font-weight="600">LAST 15 DAYS — FULL PLAN DETAIL:</text>
+      <text x="382" y="465" fill="#cbd5e1" font-size="9">• Each plan: thesis, research done, action taken</text>
+      <text x="382" y="480" fill="#cbd5e1" font-size="9">• Result of each plan (profit/loss/still open)</text>
+      <text x="382" y="495" fill="#fbbf24" font-size="8" font-weight="600">OPEN POSITIONS RIGHT NOW:</text>
+      <text x="382" y="510" fill="#cbd5e1" font-size="9">• Symbol, strike, expiry, entry price, unrealized P&amp;L</text>
+
+      <!-- Section 5: Task -->
+      <rect x="366" y="527" width="348" height="155" rx="6" fill="#0f172a"/>
+      <rect x="366" y="527" width="348" height="155" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+      <text x="382" y="546" fill="#34d399" font-size="10" font-weight="700">SECTION 5 — YOUR TASK (what LLM must output)</text>
+      <text x="382" y="563" fill="#cbd5e1" font-size="9">Step 1: State your market thesis right now</text>
+      <text x="382" y="578" fill="#cbd5e1" font-size="9">Step 2: List what research you want to do + do it</text>
+      <text x="382" y="593" fill="#cbd5e1" font-size="9">Step 3: Assess current open positions (keep/close?)</text>
+      <text x="382" y="608" fill="#cbd5e1" font-size="9">Step 4: Decide action: HOLD / OPEN trade / CLOSE trade</text>
+      <text x="382" y="623" fill="#cbd5e1" font-size="9">Step 5: Output your decision as structured JSON:</text>
+      <text x="390" y="638" fill="#64748b" font-size="8">{"action": "open", "type": "call", "strike": 560,</text>
+      <text x="390" y="651" fill="#64748b" font-size="8"> "expiry": "2026-06-06", "qty": 2, "reason": "..."}</text>
+      <text x="382" y="669" fill="#34d399" font-size="8" font-weight="600">This is very important — be precise, your portfolio depends on it</text>
+
+      <!-- LEFT SIDE: DATA SOURCES -->
+      <!-- Market Data Source -->
+      <rect x="30" y="148" width="160" height="60" rx="6" fill="#0f172a"/>
+      <rect x="30" y="148" width="160" height="60" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="110" y="170" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">fetch_market_data.py</text>
+      <text x="110" y="186" fill="#94a3b8" font-size="8" text-anchor="middle">Tradier API + CNN Fear</text>
+      <text x="110" y="199" fill="#94a3b8" font-size="8" text-anchor="middle">&amp; Greed + FRED rates</text>
+      <line x1="192" y1="178" x2="362" y2="195" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr-amber)"/>
+
+      <!-- News Source -->
+      <rect x="30" y="276" width="160" height="60" rx="6" fill="#0f172a"/>
+      <rect x="30" y="276" width="160" height="60" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="110" y="298" fill="#22d3ee" font-size="10" font-weight="600" text-anchor="middle">fetch_news.py</text>
+      <text x="110" y="314" fill="#94a3b8" font-size="8" text-anchor="middle">NewsAPI / RSS feeds</text>
+      <text x="110" y="327" fill="#94a3b8" font-size="8" text-anchor="middle">Financial news sources</text>
+      <line x1="192" y1="306" x2="362" y2="318" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arr-cyan)"/>
+
+      <!-- History Source -->
+      <rect x="30" y="384" width="160" height="60" rx="6" fill="#0f172a"/>
+      <rect x="30" y="384" width="160" height="60" rx="6" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="110" y="406" fill="#a78bfa" font-size="10" font-weight="600" text-anchor="middle">load_history.py</text>
+      <text x="110" y="422" fill="#94a3b8" font-size="8" text-anchor="middle">reads plans.jsonl</text>
+      <text x="110" y="435" fill="#94a3b8" font-size="8" text-anchor="middle">trades.jsonl · portfolio.json</text>
+      <line x1="192" y1="414" x2="362" y2="440" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arr-violet)"/>
+
+      <!-- RIGHT SIDE: OUTPUT -->
+      <rect x="800" y="384" width="170" height="85" rx="6" fill="#0f172a"/>
+      <rect x="800" y="384" width="170" height="85" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+      <text x="885" y="406" fill="#34d399" font-size="10" font-weight="600" text-anchor="middle">JSON Action Output</text>
+      <text x="885" y="423" fill="#94a3b8" font-size="8" text-anchor="middle">action: open/close/hold</text>
+      <text x="885" y="437" fill="#94a3b8" font-size="8" text-anchor="middle">symbol, strike, expiry</text>
+      <text x="885" y="451" fill="#94a3b8" font-size="8" text-anchor="middle">quantity, limit price</text>
+      <text x="885" y="465" fill="#94a3b8" font-size="8" text-anchor="middle">reasoning (text)</text>
+      <line x1="716" y1="604" x2="798" y2="435" stroke="#34d399" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-green)"/>
+
+      <!-- Role source label -->
+      <rect x="30" y="55" width="160" height="60" rx="6" fill="#0f172a"/>
+      <rect x="30" y="55" width="160" height="60" rx="6" fill="rgba(136,19,55,0.35)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="110" y="77" fill="#fb7185" font-size="10" font-weight="600" text-anchor="middle">prompt_template.txt</text>
+      <text x="110" y="93" fill="#94a3b8" font-size="8" text-anchor="middle">Static text, written once</text>
+      <text x="110" y="107" fill="#94a3b8" font-size="8" text-anchor="middle">Expert persona + CoT</text>
+      <line x1="192" y1="85" x2="362" y2="88" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- Legend -->
+      <text x="820" y="510" fill="white" font-size="10" font-weight="600">Data Sources</text>
+      <rect x="820" y="522" width="14" height="9" rx="2" fill="rgba(136,19,55,0.35)" stroke="#fb7185" stroke-width="1"/>
+      <text x="840" y="529" fill="#94a3b8" font-size="8">Static Template</text>
+      <rect x="820" y="537" width="14" height="9" rx="2" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1"/>
+      <text x="840" y="544" fill="#94a3b8" font-size="8">Market Data API</text>
+      <rect x="820" y="552" width="14" height="9" rx="2" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
+      <text x="840" y="559" fill="#94a3b8" font-size="8">News API</text>
+      <rect x="820" y="567" width="14" height="9" rx="2" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1"/>
+      <text x="840" y="574" fill="#94a3b8" font-size="8">Local Files</text>
+      <rect x="820" y="582" width="14" height="9" rx="2" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
+      <text x="840" y="589" fill="#94a3b8" font-size="8">LLM Output</text>
+    </svg>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- DIAGRAM 2: HOURLY FLOW + DATA STORAGE                             -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div class="section-label">Diagram 2 — Hourly Execution Flow &amp; Data Storage</div>
+  <div class="diagram-container">
+    <svg viewBox="0 0 1100 820" style="width:100%; min-width:900px;">
+      <defs>
+        <marker id="arr2" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+        </marker>
+        <marker id="arr2-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
+        </marker>
+        <marker id="arr2-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+        </marker>
+        <marker id="arr2-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/>
+        </marker>
+        <marker id="arr2-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/>
+        </marker>
+        <marker id="arr2-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185"/>
+        </marker>
+        <pattern id="grid2" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid2)"/>
+
+      <!-- ── CRON TRIGGER ── -->
+      <rect x="30" y="20" width="160" height="55" rx="6" fill="#0f172a"/>
+      <rect x="30" y="20" width="160" height="55" rx="6" fill="rgba(251,146,60,0.25)" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="110" y="42" fill="#fb923c" font-size="11" font-weight="700" text-anchor="middle">CRON JOB</text>
+      <text x="110" y="57" fill="#94a3b8" font-size="9" text-anchor="middle">Every 1 hour</text>
+      <text x="110" y="68" fill="#94a3b8" font-size="9" text-anchor="middle">Mon–Fri 9:30am–4pm EST</text>
+
+      <!-- Arrow: cron → step 1 -->
+      <line x1="192" y1="47" x2="248" y2="47" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+      <!-- ── STEP 1: FETCH ── -->
+      <rect x="250" y="20" width="145" height="55" rx="6" fill="#0f172a"/>
+      <rect x="250" y="20" width="145" height="55" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="323" y="40" fill="#fbbf24" font-size="10" font-weight="700" text-anchor="middle">STEP 1</text>
+      <text x="323" y="55" fill="white" font-size="9" font-weight="600" text-anchor="middle">Fetch Live Data</text>
+      <text x="323" y="68" fill="#94a3b8" font-size="8" text-anchor="middle">market + news + portfolio</text>
+
+      <!-- Arrow: step 1 → step 2 -->
+      <line x1="397" y1="47" x2="453" y2="47" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arr2-amber)"/>
+
+      <!-- ── STEP 2: BUILD PROMPT ── -->
+      <rect x="455" y="20" width="145" height="55" rx="6" fill="#0f172a"/>
+      <rect x="455" y="20" width="145" height="55" rx="6" fill="rgba(136,19,55,0.35)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="528" y="40" fill="#fb7185" font-size="10" font-weight="700" text-anchor="middle">STEP 2</text>
+      <text x="528" y="55" fill="white" font-size="9" font-weight="600" text-anchor="middle">Build Prompt</text>
+      <text x="528" y="68" fill="#94a3b8" font-size="8" text-anchor="middle">assemble all sections</text>
+
+      <!-- Arrow: step 2 → step 3 -->
+      <line x1="602" y1="47" x2="658" y2="47" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arr2-rose)"/>
+
+      <!-- ── STEP 3: LLM ── -->
+      <rect x="660" y="10" width="145" height="75" rx="6" fill="#0f172a"/>
+      <rect x="660" y="10" width="145" height="75" rx="6" fill="rgba(6,78,59,0.45)" stroke="#34d399" stroke-width="2"/>
+      <text x="733" y="33" fill="#34d399" font-size="10" font-weight="700" text-anchor="middle">STEP 3</text>
+      <text x="733" y="49" fill="white" font-size="9" font-weight="600" text-anchor="middle">LLM Reasons</text>
+      <text x="733" y="63" fill="#94a3b8" font-size="8" text-anchor="middle">Claude Sonnet 4</text>
+      <text x="733" y="76" fill="#94a3b8" font-size="8" text-anchor="middle">web research + plan</text>
+
+      <!-- Arrow: step 3 → step 4 -->
+      <line x1="807" y1="47" x2="863" y2="47" stroke="#34d399" stroke-width="1.5" marker-end="url(#arr2-green)"/>
+
+      <!-- ── STEP 4: PARSE ── -->
+      <rect x="865" y="20" width="145" height="55" rx="6" fill="#0f172a"/>
+      <rect x="865" y="20" width="145" height="55" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="938" y="40" fill="#22d3ee" font-size="10" font-weight="700" text-anchor="middle">STEP 4</text>
+      <text x="938" y="55" fill="white" font-size="9" font-weight="600" text-anchor="middle">Parse JSON Output</text>
+      <text x="938" y="68" fill="#94a3b8" font-size="8" text-anchor="middle">extract action + validate</text>
+
+      <!-- Arrow step 4 down to step 5 -->
+      <line x1="938" y1="77" x2="938" y2="128" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arr2-cyan)"/>
+
+      <!-- ── STEP 5: RISK CHECK ── -->
+      <rect x="865" y="130" width="145" height="70" rx="6" fill="#0f172a"/>
+      <rect x="865" y="130" width="145" height="70" rx="6" fill="rgba(136,19,55,0.35)" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="938" y="151" fill="#fb7185" font-size="10" font-weight="700" text-anchor="middle">STEP 5</text>
+      <text x="938" y="166" fill="white" font-size="9" font-weight="600" text-anchor="middle">Risk Guard Check</text>
+      <text x="938" y="181" fill="#94a3b8" font-size="8" text-anchor="middle">max position size?</text>
+      <text x="938" y="193" fill="#94a3b8" font-size="8" text-anchor="middle">daily loss limit hit?</text>
+
+      <!-- PASS / BLOCK labels -->
+      <line x1="938" y1="202" x2="938" y2="258" stroke="#34d399" stroke-width="1.5" marker-end="url(#arr2-green)"/>
+      <text x="944" y="234" fill="#34d399" font-size="9">PASS</text>
+      <line x1="863" y1="165" x2="780" y2="165" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr2-rose)"/>
+      <text x="800" y="158" fill="#fb7185" font-size="8">BLOCK</text>
+      <rect x="680" y="148" width="98" height="34" rx="4" fill="rgba(136,19,55,0.2)" stroke="#fb7185" stroke-width="1"/>
+      <text x="729" y="162" fill="#fb7185" font-size="8" text-anchor="middle">Skip trade,</text>
+      <text x="729" y="173" fill="#fb7185" font-size="8" text-anchor="middle">log blocked reason</text>
+
+      <!-- ── STEP 6: EXECUTE ── -->
+      <rect x="865" y="260" width="145" height="70" rx="6" fill="#0f172a"/>
+      <rect x="865" y="260" width="145" height="70" rx="6" fill="rgba(6,78,59,0.45)" stroke="#34d399" stroke-width="2"/>
+      <text x="938" y="282" fill="#34d399" font-size="10" font-weight="700" text-anchor="middle">STEP 6</text>
+      <text x="938" y="297" fill="white" font-size="9" font-weight="600" text-anchor="middle">Execute Trade</text>
+      <text x="938" y="312" fill="#94a3b8" font-size="8" text-anchor="middle">Tradier API (sandbox)</text>
+      <text x="938" y="323" fill="#94a3b8" font-size="8" text-anchor="middle">buy_to_open / sell_to_close</text>
+
+      <!-- Arrow step 6 down to step 7 -->
+      <line x1="938" y1="332" x2="938" y2="383" stroke="#34d399" stroke-width="1.5" marker-end="url(#arr2-green)"/>
+
+      <!-- ── STEP 7: LOG EVERYTHING ── -->
+      <rect x="865" y="385" width="145" height="70" rx="6" fill="#0f172a"/>
+      <rect x="865" y="385" width="145" height="70" rx="6" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="938" y="407" fill="#a78bfa" font-size="10" font-weight="700" text-anchor="middle">STEP 7</text>
+      <text x="938" y="422" fill="white" font-size="9" font-weight="600" text-anchor="middle">Save Everything</text>
+      <text x="938" y="437" fill="#94a3b8" font-size="8" text-anchor="middle">plan + action + result</text>
+      <text x="938" y="449" fill="#94a3b8" font-size="8" text-anchor="middle">→ state files on disk</text>
+
+      <!-- ═══════════════════ DATA STORAGE SECTION ═══════════════════ -->
+      <!-- Section boundary -->
+      <rect x="20" y="510" width="1060" height="290" rx="12" fill="rgba(76,29,149,0.06)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="6,3"/>
+      <text x="34" y="528" fill="#a78bfa" font-size="10" font-weight="700">DATA STORAGE — ~/trading-bot/state/</text>
+
+      <!-- plans.jsonl -->
+      <rect x="40" y="540" width="230" height="240" rx="8" fill="#0f172a"/>
+      <rect x="40" y="540" width="230" height="240" rx="8" fill="rgba(76,29,149,0.25)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="155" y="562" fill="#a78bfa" font-size="10" font-weight="700" text-anchor="middle">plans.jsonl</text>
+      <text x="155" y="578" fill="#64748b" font-size="8" text-anchor="middle">One line per hourly run</text>
+      <text x="56" y="598" fill="#fbbf24" font-size="8" font-weight="600">Fields:</text>
+      <text x="56" y="613" fill="#94a3b8" font-size="8">id, timestamp</text>
+      <text x="56" y="627" fill="#94a3b8" font-size="8">market_thesis (LLM's view)</text>
+      <text x="56" y="641" fill="#94a3b8" font-size="8">research_done (what it googled)</text>
+      <text x="56" y="655" fill="#94a3b8" font-size="8">steps [ ] (full plan text)</text>
+      <text x="56" y="669" fill="#94a3b8" font-size="8">action_taken (open/close/hold)</text>
+      <text x="56" y="683" fill="#94a3b8" font-size="8">confidence (high/medium/low)</text>
+      <text x="56" y="697" fill="#94a3b8" font-size="8">open_positions_count</text>
+      <text x="56" y="711" fill="#94a3b8" font-size="8">total_pnl_at_time</text>
+      <text x="56" y="730" fill="#34d399" font-size="7">→ last 15 days loaded into prompt</text>
+      <text x="56" y="743" fill="#34d399" font-size="7">→ older entries kept, not sent to LLM</text>
+
+      <!-- trades.jsonl -->
+      <rect x="290" y="540" width="230" height="240" rx="8" fill="#0f172a"/>
+      <rect x="290" y="540" width="230" height="240" rx="8" fill="rgba(120,53,15,0.25)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="405" y="562" fill="#fbbf24" font-size="10" font-weight="700" text-anchor="middle">trades.jsonl</text>
+      <text x="405" y="578" fill="#64748b" font-size="8" text-anchor="middle">One line per trade opened/closed</text>
+      <text x="306" y="598" fill="#fbbf24" font-size="8" font-weight="600">Fields:</text>
+      <text x="306" y="613" fill="#94a3b8" font-size="8">id, plan_id (links to plan)</text>
+      <text x="306" y="627" fill="#94a3b8" font-size="8">symbol, option_type (call/put)</text>
+      <text x="306" y="641" fill="#94a3b8" font-size="8">strike, expiry</text>
+      <text x="306" y="655" fill="#94a3b8" font-size="8">opened_at, closed_at</text>
+      <text x="306" y="669" fill="#94a3b8" font-size="8">entry_price, exit_price</text>
+      <text x="306" y="683" fill="#94a3b8" font-size="8">quantity, status (open/closed)</text>
+      <text x="306" y="697" fill="#94a3b8" font-size="8">pnl (null until closed)</text>
+      <text x="306" y="711" fill="#94a3b8" font-size="8">tradier_order_id</text>
+      <text x="306" y="730" fill="#34d399" font-size="7">→ all-time summary sent to LLM</text>
+      <text x="306" y="743" fill="#34d399" font-size="7">→ open positions sent in full detail</text>
+
+      <!-- portfolio.json -->
+      <rect x="540" y="540" width="230" height="240" rx="8" fill="#0f172a"/>
+      <rect x="540" y="540" width="230" height="240" rx="8" fill="rgba(8,51,68,0.35)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="655" y="562" fill="#22d3ee" font-size="10" font-weight="700" text-anchor="middle">portfolio.json</text>
+      <text x="655" y="578" fill="#64748b" font-size="8" text-anchor="middle">Rolling current state (updated each run)</text>
+      <text x="556" y="598" fill="#fbbf24" font-size="8" font-weight="600">Fields:</text>
+      <text x="556" y="613" fill="#94a3b8" font-size="8">starting_capital: $100,000</text>
+      <text x="556" y="627" fill="#94a3b8" font-size="8">current_cash (live from Tradier)</text>
+      <text x="556" y="641" fill="#94a3b8" font-size="8">open_positions [ ] (with live P&amp;L)</text>
+      <text x="556" y="655" fill="#94a3b8" font-size="8">total_realized_pnl</text>
+      <text x="556" y="669" fill="#94a3b8" font-size="8">total_unrealized_pnl</text>
+      <text x="556" y="683" fill="#94a3b8" font-size="8">total_trades, win_rate</text>
+      <text x="556" y="697" fill="#94a3b8" font-size="8">winning_trades, losing_trades</text>
+      <text x="556" y="711" fill="#94a3b8" font-size="8">last_updated timestamp</text>
+      <text x="556" y="730" fill="#34d399" font-size="7">→ refreshed from Tradier each run</text>
+      <text x="556" y="743" fill="#34d399" font-size="7">→ summary always in prompt header</text>
+
+      <!-- market_snapshots.jsonl -->
+      <rect x="790" y="540" width="275" height="240" rx="8" fill="#0f172a"/>
+      <rect x="790" y="540" width="275" height="240" rx="8" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+      <text x="928" y="562" fill="#94a3b8" font-size="10" font-weight="700" text-anchor="middle">market_snapshots.jsonl</text>
+      <text x="928" y="578" fill="#64748b" font-size="8" text-anchor="middle">Hourly market data archive</text>
+      <text x="806" y="598" fill="#fbbf24" font-size="8" font-weight="600">Fields (per snapshot):</text>
+      <text x="806" y="613" fill="#94a3b8" font-size="8">timestamp, spy_price, spy_change%</text>
+      <text x="806" y="627" fill="#94a3b8" font-size="8">vix, fear_greed_score (0-100)</text>
+      <text x="806" y="641" fill="#94a3b8" font-size="8">treasury_10y_yield, fed_rate</text>
+      <text x="806" y="655" fill="#94a3b8" font-size="8">rsi_14, ma_20, ma_50, ma_200</text>
+      <text x="806" y="669" fill="#94a3b8" font-size="8">support_level, resistance_level</text>
+      <text x="806" y="683" fill="#94a3b8" font-size="8">top_news [ ] (5 headlines)</text>
+      <text x="806" y="697" fill="#94a3b8" font-size="8">options_chain_summary</text>
+      <text x="806" y="730" fill="#34d399" font-size="7">→ current snapshot sent in prompt</text>
+      <text x="806" y="743" fill="#34d399" font-size="7">→ archive useful for LLM pattern analysis</text>
+
+      <!-- Arrows from STEP 7 down into storage -->
+      <line x1="900" y1="457" x2="155" y2="538" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr2-violet)"/>
+      <line x1="920" y1="457" x2="405" y2="538" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr2-amber)"/>
+      <line x1="940" y1="457" x2="655" y2="538" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr2-cyan)"/>
+      <line x1="960" y1="457" x2="928" y2="538" stroke="#64748b" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arr2)"/>
+
+      <!-- Feedback loop: storage → step 1 -->
+      <path d="M 155 540 L 155 490 L 323 490 L 323 77" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arr2-violet)"/>
+      <text x="230" y="484" fill="#a78bfa" font-size="8">loaded next run</text>
+    </svg>
+  </div>
+
+  <!-- Info Cards -->
+  <div class="cards">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot amber"></div>
+        <h3>Prompt Composition</h3>
+      </div>
+      <ul>
+        <li>• Section 1: Role — static, loaded once</li>
+        <li>• Section 2: Market data — fresh every run</li>
+        <li>• Section 3: News — fresh every run (3 days)</li>
+        <li>• Section 4: History — last 15 plans (full) + all-time trade summary</li>
+        <li>• Section 5: Task — static template, tells LLM exactly what to output</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot violet"></div>
+        <h3>Data Storage Strategy</h3>
+      </div>
+      <ul>
+        <li>• plans.jsonl — append-only log of every LLM plan</li>
+        <li>• trades.jsonl — append-only log of every trade</li>
+        <li>• portfolio.json — rewritten each run with live state</li>
+        <li>• market_snapshots.jsonl — archive of hourly market data</li>
+        <li>• All files are plain JSON — easy to inspect, debug, audit</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot rose"></div>
+        <h3>Risk Guardrails (in code)</h3>
+      </div>
+      <ul>
+        <li>• Max single trade: 10% of portfolio ($10k)</li>
+        <li>• Max open positions: 5 at a time</li>
+        <li>• Daily loss limit: $3,000 (stop trading)</li>
+        <li>• Always use limit orders, never market orders</li>
+        <li>• Block executes in Python — LLM cannot override</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="footer">SPY Options Bot · Tradier Sandbox · ~/trading-bot/ · Built with Hermes Agent</p>
+</div>
+</body>
+</html>
