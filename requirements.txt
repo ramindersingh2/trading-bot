@@ -1,0 +1,8 @@
+# No external dependencies required for core functionality.
+# All API calls use Python stdlib (urllib, json, http.server).
+#
+# Only needed if you want to run the dashboard with rich formatting:
+# rich>=13.0.0
+#
+# Only needed for copy_trader.py (Discord browser automation):
+# playwright>=1.40.0
