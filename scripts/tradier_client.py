@@ -301,7 +301,6 @@ def sync_portfolio():
 # ── Quick self-test ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print(f"Mode: {MODE}  |  Account: {ACCOUNT}")
-    print(f"Token: {TOKEN[:8]}...")
     print()
 
     print("=== Balances ===")

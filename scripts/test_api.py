@@ -39,8 +39,6 @@ def api_get(path):
         body = e.read().decode() if e.fp else ""
         return e.code, body
 
-print(f"Token (first 8 chars): {TOKEN[:8]}...")
-print(f"Token length: {len(TOKEN)}")
 print()
 
 # Test 1: Account balances
